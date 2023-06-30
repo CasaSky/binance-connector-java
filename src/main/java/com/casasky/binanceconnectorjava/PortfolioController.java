@@ -21,16 +21,22 @@ class PortfolioController {
         this.binanceConnector = binanceConnector;
     }
 
-    @GetMapping("wallet/snapshot/filter")
+    @GetMapping("wallet/snapshot/asset")
     @ResponseBody
-    ResponseEntity<AccountSnapshot> walletSnapshotByAsset(@RequestParam Asset asset, @RequestParam Integer limit) {
-       return ResponseEntity.ok(binanceConnector.retrieveWalletSnapshotByAsset(asset, limit));
+    ResponseEntity<AccountSnapshot> walletSnapshotByAsset(@RequestParam Asset asset) {
+       return ResponseEntity.ok(binanceConnector.retrieveWalletSnapshotByAsset(asset));
     }
 
     @GetMapping("wallet/snapshot")
     @ResponseBody
     ResponseEntity<AccountSnapshot> walletSnapshot() {
         return ResponseEntity.ok(binanceConnector.retrieveWalletSnapshot());
+    }
+
+    @GetMapping("wallet/snapshot/compact")
+    @ResponseBody
+    ResponseEntity<AccountSnapshot> walletSnapshotCompact(@RequestParam Integer limit) {
+        return ResponseEntity.ok(binanceConnector.retrieveWalletSnapshotCompact(limit));
     }
 
     @GetMapping("price")

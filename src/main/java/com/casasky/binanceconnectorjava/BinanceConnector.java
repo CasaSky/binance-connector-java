@@ -42,21 +42,28 @@ class BinanceConnector {
         return deserialize(sendRequest(priceUri(symbol)), Price.class);
     }
 
-    AccountSnapshot retrieveWalletSnapshotByAsset(Asset asset, Integer limit) {
-        return accountSnapshotMapperByAsset(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey), asset, limit);
+    AccountSnapshot retrieveWalletSnapshotByAsset(Asset asset) {
+        return accountSnapshotMapperByAsset(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey), asset);
     }
 
     AccountSnapshot retrieveWalletSnapshot() {
         return accountSnapshotMapper(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey));
     }
 
+    AccountSnapshot retrieveWalletSnapshotCompact(Integer limit) {
+        return accountSnapshotMapperCompact(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey), limit);
+    }
+
     private AccountSnapshot accountSnapshotMapper(String rawData) {
         return accountSnapshotTransformer(rawData, BinanceConnector::normalizedBalance);
     }
 
-    private AccountSnapshot accountSnapshotMapperByAsset(String body, Asset assetParam, Integer limit) {
-        return accountSnapshotTransformer(body, accountSnapshot -> normalizedBalance(accountSnapshot).filter(b -> b.isAssetEqualTo(assetParam))
-                .limit(limit));
+    private AccountSnapshot accountSnapshotMapperByAsset(String body, Asset assetParam) {
+        return accountSnapshotTransformer(body, accountSnapshot -> normalizedBalance(accountSnapshot).filter(b -> b.isAssetEqualTo(assetParam)));
+    }
+
+    private AccountSnapshot accountSnapshotMapperCompact(String body, Integer limit) {
+        return accountSnapshotTransformer(body, accountSnapshot -> normalizedBalance(accountSnapshot).limit(limit));
     }
 
     private AccountSnapshot accountSnapshotTransformer(String body, Function<AccountSnapshot, Stream<Balance>> consumer) {

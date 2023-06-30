@@ -29,7 +29,7 @@ class BinanceConnectorTest {
 
     @Test
     void walletSnapshot() {
-        assertThat(binanceConnector.retrieveWalletSnapshotByAsset(Asset.BTC,1)).satisfies(accountSnapshot -> {
+        assertThat(binanceConnector.retrieveWalletSnapshotByAsset(Asset.BTC)).satisfies(accountSnapshot -> {
             assertThat(accountSnapshot).extracting(AccountSnapshot::totalAssetOfBtc, as(InstanceOfAssertFactories.BIG_DECIMAL))
                     .isPositive();
             assertThat(accountSnapshot).extracting(AccountSnapshot::balances)
