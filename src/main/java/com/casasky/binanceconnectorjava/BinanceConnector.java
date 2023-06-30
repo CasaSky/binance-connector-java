@@ -3,6 +3,7 @@ package com.casasky.binanceconnectorjava;
 import com.casasky.binanceconnectorjava.exception.BinanceApiException;
 import com.casasky.binanceconnectorjava.exception.DeserializationException;
 import com.casasky.binanceconnectorjava.model.AccountSnapshot;
+import com.casasky.binanceconnectorjava.model.AccountSnapshot.Balance;
 import com.casasky.binanceconnectorjava.model.Asset;
 import com.casasky.binanceconnectorjava.model.Price;
 import com.casasky.binanceconnectorjava.model.Symbol;
@@ -20,7 +21,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static com.casasky.binanceconnectorjava.tool.BinanceApiTool.priceUri;
 import static com.casasky.binanceconnectorjava.tool.BinanceApiTool.walletSnapshotUri;
@@ -38,8 +42,56 @@ class BinanceConnector {
         return deserialize(sendRequest(priceUri(symbol)), Price.class);
     }
 
-    AccountSnapshot walletSnapshot(Optional<Asset> asset, Optional<Integer> limit) {
-        return accountSnapshot(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey), asset, limit);
+    AccountSnapshot retrieveWalletSnapshotByAsset(Asset asset, Integer limit) {
+        return accountSnapshotMapperByAsset(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey), asset, limit);
+    }
+
+    AccountSnapshot retrieveWalletSnapshot() {
+        return accountSnapshotMapper(sendRequest(walletSnapshotUri(binanceSecretKey), "X-MBX-APIKEY", binanceApiKey));
+    }
+
+    private AccountSnapshot accountSnapshotMapper(String rawData) {
+        return accountSnapshotTransformer(rawData, BinanceConnector::normalizedBalance);
+    }
+
+    private AccountSnapshot accountSnapshotMapperByAsset(String body, Asset assetParam, Integer limit) {
+        return accountSnapshotTransformer(body, accountSnapshot -> normalizedBalance(accountSnapshot).filter(b -> b.isAssetEqualTo(assetParam))
+                .limit(limit));
+    }
+
+    private AccountSnapshot accountSnapshotTransformer(String body, Function<AccountSnapshot, Stream<Balance>> consumer) {
+        AccountSnapshot accountSnapshot = deserializeAccountSnapshot(body);
+        List<Balance> balance = consumer.apply(accountSnapshot).toList();
+        return new AccountSnapshot(btcToEuro(accountSnapshot.totalAssetOfBtc()), accountSnapshot.totalAssetOfBtc(), balance);
+    }
+
+    private static AccountSnapshot deserializeAccountSnapshot(String body) {
+        var deserializedBody = deserialize(body, ObjectNode.class);
+        return Optional.ofNullable(deserializedBody)
+                .map(node -> node.get("snapshotVos"))
+                .map(snapshotVosList -> snapshotVosList.get(0))
+                .map(snapshotVos -> snapshotVos.get("data"))
+                .map(data -> deserialize(data.toString(), AccountSnapshot.class))
+                .orElseThrow(DeserializationException::new);
+    }
+
+    private static Stream<Balance> normalizedBalance(AccountSnapshot accountSnapshot) {
+        return accountSnapshot.balances()
+                .stream()
+                .filter(Balance::isPositive)
+                .sorted(Comparator.comparing(Balance::free).reversed());
+    }
+
+    BigDecimal btcToEuro(BigDecimal totalAssetOfBtc) {
+        return totalAssetOfBtc.multiply(price(Symbol.BTCEUR).price());
+    }
+
+    private static <T> T deserialize(String message, Class<T> clazz) {
+        try {
+            return new ObjectMapper().readValue(message, clazz);
+        } catch (JsonProcessingException e) {
+            throw new DeserializationException();
+        }
     }
 
     private static HttpRequest httpRequest(URI uri, String... headers) {
@@ -58,36 +110,6 @@ class BinanceConnector {
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BinanceApiException();
-        }
-    }
-
-    private AccountSnapshot accountSnapshot(String body, Optional<Asset> assetParam, Optional<Integer> limit) {
-        var deserializedBody = deserialize(body, ObjectNode.class);
-        AccountSnapshot accountSnapshot = Optional.ofNullable(deserializedBody)
-                .map(node -> node.get("snapshotVos"))
-                .map(snapshotVosList -> snapshotVosList.get(0))
-                .map(snapshotVos -> snapshotVos.get("data"))
-                .map(data -> deserialize(data.toString(), AccountSnapshot.class))
-                .orElseThrow(DeserializationException::new);
-
-        return new AccountSnapshot(btcToEuro(accountSnapshot.totalAssetOfBtc()), accountSnapshot.totalAssetOfBtc(), accountSnapshot.balances()
-                .stream()
-                .filter(AccountSnapshot.Balance::isPositive)
-                .filter(b -> assetParam.map(b::isAssetEqualTo).orElse(true))
-                .sorted(Comparator.comparing(AccountSnapshot.Balance::free).reversed())
-                .limit(limit.orElse(Integer.MAX_VALUE))
-                .toList());
-    }
-
-    BigDecimal btcToEuro(BigDecimal totalAssetOfBtc) {
-        return totalAssetOfBtc.multiply(price(Symbol.BTCEUR).price());
-    }
-
-    private static <T> T deserialize(String message, Class<T> clazz) {
-        try {
-            return new ObjectMapper().readValue(message, clazz);
-        } catch (JsonProcessingException e) {
-            throw new DeserializationException();
         }
     }
 

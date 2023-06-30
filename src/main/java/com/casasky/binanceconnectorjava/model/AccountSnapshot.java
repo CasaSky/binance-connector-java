@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 public record AccountSnapshot(BigDecimal totalAssetOfEur, BigDecimal totalAssetOfBtc, List<Balance> balances) {
 
@@ -16,7 +17,7 @@ public record AccountSnapshot(BigDecimal totalAssetOfEur, BigDecimal totalAssetO
 
         @JsonIgnore
         public boolean isAssetEqualTo(Asset assetParam) {
-            return asset.equals(assetParam.name());
+            return Objects.equals(asset, assetParam.name());
         }
     }
 
