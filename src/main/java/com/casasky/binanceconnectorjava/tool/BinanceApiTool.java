@@ -35,7 +35,7 @@ public class BinanceApiTool {
     }
 
     private static long startTime() {
-        return Instant.now().minus(Duration.ofHours(12)).toEpochMilli();
+        return Instant.now().minus(Duration.ofDays(1)).toEpochMilli();
     }
 
     private static long endTime() {
